@@ -1,0 +1,29 @@
+{
+  "name": "smart-reader",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Read PDFs and EPUBs and get context-aware explanations of unfamiliar words.",
+  "scripts": {
+    "dev": "node server.js --dev",
+    "build": "vite build",
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
+    "dotenv": "^18.0.5",
+    "epubjs": "^0.3.93",
+    "express": "^5.2.1",
+    "pdfjs-dist": "^6.3.289",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.1",
+    "vite": "^8.3.2"
+  }
+}

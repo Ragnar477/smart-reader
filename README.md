@@ -70,8 +70,8 @@ src/VocabList.jsx    Saved words and CSV export
 src/speech.js        Browser text-to-speech
 ```
 
-Each lookup is one small request to Claude Haiku 4.5 (roughly 300 tokens in and
-200 out), so cost is a fraction of a cent per word. Repeated lookups of the same
+Each lookup is one small request to Claude Haiku 4.5 (well under 1,000 tokens in
+total), so it costs a fraction of a cent per word. Repeated lookups of the same
 word in the same passage are cached in the page. The server also limits each
 visitor to 30 lookups a minute so a public deployment can't drain your key.
 

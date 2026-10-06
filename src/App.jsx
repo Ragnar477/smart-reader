@@ -3,13 +3,17 @@ import PdfReader from "./PdfReader.jsx";
 import EpubReader from "./EpubReader.jsx";
 import ExplainPanel from "./ExplainPanel.jsx";
 import VocabList from "./VocabList.jsx";
+import PassagePanel from "./PassagePanel.jsx";
+import Review from "./Review.jsx";
 import { load, save } from "./storage.js";
+import { dueEntries, grade, newCard, withCard } from "./cards.js";
 
 const LANGUAGES = [
   "", "English", "French", "Arabic", "Spanish", "German", "Italian", "Portuguese",
   "Dutch", "Turkish", "Russian", "Chinese (Simplified)", "Japanese", "Korean", "Hindi",
 ];
 const VOCAB_KEY = "smart-reader:vocabulary";
+const LANGUAGE_KEY = "smart-reader:native-language";
 
 function detectFormat(file) {
   const name = file.name.toLowerCase();
@@ -24,15 +28,23 @@ export default function App() {
   const [noTextPages, setNoTextPages] = useState(0);
   const [lookup, setLookup] = useState(null); // { selection, status, result, error }
   const [tab, setTab] = useState("explain");
-  const [vocab, setVocab] = useState(() => load(VOCAB_KEY, []));
-  const [targetLanguage, setTargetLanguage] = useState(() => load("smart-reader:target-language", ""));
+  const [vocab, setVocab] = useState(() => load(VOCAB_KEY, []).map(withCard));
+  // v1 stored this as the "Translate to" language.
+  const [nativeLanguage, setNativeLanguage] = useState(() => load(LANGUAGE_KEY, load("smart-reader:target-language", "")));
+  const [now, setNow] = useState(() => new Date());
   const [dragging, setDragging] = useState(false);
   const fileInput = useRef(null);
   const abortRef = useRef(null);
   const cache = useRef(new Map());
 
   useEffect(() => save(VOCAB_KEY, vocab), [vocab]);
-  useEffect(() => save("smart-reader:target-language", targetLanguage), [targetLanguage]);
+  useEffect(() => save(LANGUAGE_KEY, nativeLanguage), [nativeLanguage]);
+  // Re-check which cards are due every minute.
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+  const due = dueEntries(vocab, now);
 
   async function openFile(file) {
     if (!file) return;
@@ -51,7 +63,8 @@ export default function App() {
   const explain = useCallback(
     async (selection) => {
       setTab("explain");
-      const cacheKey = `${selection.word}|${selection.context}|${targetLanguage}`;
+      const isPassage = selection.kind === "passage";
+      const cacheKey = JSON.stringify([selection.kind, selection.word ?? selection.text, selection.context, nativeLanguage]);
       if (cache.current.has(cacheKey)) {
         setLookup({ selection, status: "done", result: cache.current.get(cacheKey) });
         return;
@@ -61,10 +74,14 @@ export default function App() {
       abortRef.current = controller;
       setLookup({ selection, status: "loading" });
       try {
-        const res = await fetch("/api/explain", {
+        const res = await fetch(isPassage ? "/api/explain-passage" : "/api/explain", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ word: selection.word, context: selection.context, targetLanguage }),
+          body: JSON.stringify(
+            isPassage
+              ? { text: selection.text, context: selection.context, nativeLanguage }
+              : { word: selection.word, context: selection.context, nativeLanguage },
+          ),
           signal: controller.signal,
         });
         const body = await res.json().catch(() => ({}));
@@ -77,11 +94,12 @@ export default function App() {
         setLookup({ selection, status: "error", error: msg });
       }
     },
-    [targetLanguage],
+    [nativeLanguage],
   );
 
   const isSaved =
     lookup?.status === "done" &&
+    lookup.selection.kind === "word" &&
     vocab.some((v) => v.word.toLowerCase() === lookup.selection.word.toLowerCase() && v.sentence === lookup.selection.sentence);
 
   function saveWord() {
@@ -98,9 +116,16 @@ export default function App() {
       sentence: selection.sentence,
       book: book?.title ?? "",
       savedAt: new Date().toISOString(),
+      card: newCard(),
     };
     setVocab((v) => [entry, ...v]);
+    setNow(new Date()); // the new card is due right away
   }
+
+  const onGrade = useCallback((id, rating) => {
+    setVocab((v) => v.map((e) => (e.id === id ? grade(e, rating) : e)));
+    setNow(new Date());
+  }, []);
 
   const onDrop = (e) => {
     e.preventDefault();
@@ -117,10 +142,10 @@ export default function App() {
         </div>
         <div className="topbar-actions">
           <label className="lang">
-            Translate to
-            <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)}>
+            I speak
+            <select value={nativeLanguage} onChange={(e) => setNativeLanguage(e.target.value)}>
               {LANGUAGES.map((l) => (
-                <option key={l} value={l}>{l || "No translation"}</option>
+                <option key={l} value={l}>{l || "Same as the book"}</option>
               ))}
             </select>
           </label>
@@ -160,13 +185,20 @@ export default function App() {
             <button role="tab" aria-selected={tab === "explain"} className={tab === "explain" ? "active" : ""} onClick={() => setTab("explain")}>
               Explanation
             </button>
+            <button role="tab" aria-selected={tab === "review"} className={tab === "review" ? "active" : ""} onClick={() => setTab("review")}>
+              Review{due.length > 0 && <span className="count">{due.length}</span>}
+            </button>
             <button role="tab" aria-selected={tab === "vocab"} className={tab === "vocab" ? "active" : ""} onClick={() => setTab("vocab")}>
               Vocabulary{vocab.length > 0 && <span className="count">{vocab.length}</span>}
             </button>
           </nav>
           <div className="panel-body">
-            {tab === "explain" ? (
+            {tab === "explain" && lookup?.selection.kind === "passage" ? (
+              <PassagePanel lookup={lookup} onRetry={() => explain(lookup.selection)} />
+            ) : tab === "explain" ? (
               <ExplainPanel lookup={lookup} onSave={saveWord} isSaved={isSaved} onRetry={() => lookup && explain(lookup.selection)} />
+            ) : tab === "review" ? (
+              <Review due={due} total={vocab.length} onGrade={onGrade} />
             ) : (
               <VocabList items={vocab} onRemove={(id) => setVocab((v) => v.filter((x) => x.id !== id))} />
             )}

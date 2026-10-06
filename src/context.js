@@ -71,11 +71,17 @@ export function cleanWord(raw) {
     .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
 }
 
-// Returns null when the selection is empty or too long to be "a word".
+const MAX_WORD_WORDS = 6;
+const MAX_PASSAGE = 2000;
+
+// Returns { kind: "word", word, context, sentence } for up to six words,
+// { kind: "passage", text, context } for a longer selection, or null when the
+// selection is empty or too long to explain.
 export function extractSelection(root, selection) {
   if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null;
   const word = cleanWord(selection.toString());
-  if (!word || word.length > 80 || word.split(" ").length > 6) return null;
+  if (!word) return null;
+  if (word.length > 80 || word.split(" ").length > MAX_WORD_WORDS) return extractPassage(root, selection);
 
   const range = selection.getRangeAt(0);
   if (!root.contains(range.startContainer)) return null;
@@ -95,5 +101,20 @@ export function extractSelection(root, selection) {
   }
   const context = clean(text.slice(start, end));
   const sentence = clean(text.slice(ends[Math.max(0, i - 1)], ends[i]));
-  return { word, context, sentence };
+  return { kind: "word", word, context, sentence };
+}
+
+function extractPassage(root, selection) {
+  const text = clean(selection.toString());
+  if (text.length > MAX_PASSAGE) return null;
+  const range = selection.getRangeAt(0);
+  if (!root.contains(range.startContainer)) return null;
+  // Context = the selection plus the sentence before it, so pronouns and references make sense.
+  const { text: all, offset } = flatten(root, range);
+  const ends = sentenceBounds(all);
+  let i = ends.findIndex((e) => e > offset);
+  if (i === -1) i = ends.length - 1;
+  const from = ends[Math.max(0, i - 2)];
+  const context = clean(all.slice(from, Math.min(all.length, offset + selection.toString().length + 1)));
+  return { kind: "passage", text, context: context.length <= 4000 ? context : text };
 }

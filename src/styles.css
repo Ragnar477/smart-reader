@@ -76,7 +76,7 @@ select { font: inherit; color: inherit; background: var(--surface); border: 1px 
 .page-turn:hover { color: var(--accent); }
 
 .tabs { display: flex; border-bottom: 1px solid var(--border); }
-.tabs button { flex: 1; border: none; border-radius: 0; padding: 12px; background: transparent; color: var(--muted); border-bottom: 2px solid transparent; }
+.tabs button { flex: 1; border: none; border-radius: 0; padding: 12px 6px; background: transparent; color: var(--muted); border-bottom: 2px solid transparent; }
 .tabs button.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
 .count { margin-left: 6px; background: var(--accent); color: var(--accent-text); border-radius: 10px; padding: 0 7px; font-size: 0.8rem; }
 .panel-body { flex: 1; overflow: auto; padding: 16px; }
@@ -110,6 +110,22 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; padding: 0 1
 .vocab-word .remove { margin-left: auto; color: var(--muted); }
 .vocab-sentence { font-style: italic; color: var(--muted); font-size: 0.9rem; }
 .vocab-source { font-size: 0.8rem; color: var(--muted); }
+
+.notes { margin: 0; padding-left: 18px; line-height: 1.5; }
+.notes li { margin-bottom: 6px; }
+.notes strong { margin-right: 4px; }
+
+.review .flashcard { border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: var(--surface-2); margin-top: 8px; }
+.flashcard h2 { margin: 0; font-size: 1.6rem; word-break: break-word; }
+.flashcard blockquote { margin: 12px 0 4px; line-height: 1.5; color: var(--muted); }
+.flashcard .answer { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 12px; }
+.flashcard .answer p { margin: 4px 0; line-height: 1.5; }
+.reveal { width: 100%; margin-top: 14px; padding: 10px; }
+.grades { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; }
+.grade { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; }
+.grade small { color: var(--muted); font-size: 0.75rem; }
+.grade-again span { color: var(--error); }
+.grade-good span, .grade-easy span { color: var(--accent); }
 
 @media (max-width: 800px) {
   .layout { grid-template-columns: 1fr; grid-template-rows: 1fr 40%; }

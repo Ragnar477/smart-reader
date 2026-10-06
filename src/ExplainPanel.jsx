@@ -20,7 +20,7 @@ export default function ExplainPanel({ lookup, onSave, isSaved, onRetry }) {
     return (
       <div className="panel-empty">
         <p className="panel-hint">Select a word in the book to see what it means in that sentence.</p>
-        <p className="panel-sub">Double-click a word, or drag across a short phrase.</p>
+        <p className="panel-sub">Double-click a word, or drag across a short phrase. Select a whole sentence or paragraph to have the passage explained.</p>
       </div>
     );
   }

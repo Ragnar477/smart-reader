@@ -62,40 +62,74 @@ async function askClaude(task, { system, user, schema }) {
   }
 }
 
-async function askLocal(task, { system, user, schema }) {
-  let res;
+// Small local models often wrap JSON in prose, code fences or <think> blocks,
+// or leave out fields they had nothing to say about. Be forgiving about all of that.
+function parseLocalAnswer(text, schema) {
+  const cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/```(?:json)?/g, "");
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start === -1 || end <= start) return null;
+  let data;
   try {
-    res = await fetch(`${LOCAL_URL}/chat/completions`, {
+    data = JSON.parse(cleaned.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+  for (const [key, field] of Object.entries(schema.shape)) {
+    if (data[key] == null) data[key] = field instanceof z.ZodArray ? [] : "";
+  }
+  const parsed = schema.safeParse(data);
+  return parsed.success ? parsed.data : null;
+}
+
+async function callLocal(body) {
+  try {
+    return await fetch(`${LOCAL_URL}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...(LOCAL_MODEL && { model: LOCAL_MODEL }),
-        temperature: 0.2,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-        response_format: {
-          type: "json_schema",
-          json_schema: { name: `${task}_explanation`, strict: true, schema: z.toJSONSchema(schema) },
-        },
-      }),
+      body: JSON.stringify(body),
     });
   } catch {
     throw new LlmError(502, `Could not reach the local model at ${LOCAL_URL}. Is LM Studio's server running?`);
   }
+}
+
+async function askLocal(task, { system, user, schema }) {
+  const { $schema, ...jsonSchema } = z.toJSONSchema(schema);
+  const base = { ...(LOCAL_MODEL && { model: LOCAL_MODEL }), temperature: 0.2 };
+  let res = await callLocal({
+    ...base,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    response_format: { type: "json_schema", json_schema: { name: `${task}_explanation`, strict: true, schema: jsonSchema } },
+  });
+  if (res.status === 400) {
+    // Some servers or models don't support structured output: ask for JSON in the prompt instead.
+    console.warn(`Local model rejected the JSON schema format (${await res.text().catch(() => "")}); retrying without it.`);
+    res = await callLocal({
+      ...base,
+      messages: [
+        { role: "system", content: `${system}\n\nReply with only a JSON object that matches this JSON schema, no other text:\n${JSON.stringify(jsonSchema)}` },
+        { role: "user", content: user },
+      ],
+    });
+  }
   if (!res.ok) {
-    console.error(`Local model error ${res.status}: ${await res.text().catch(() => "")}`);
-    throw new LlmError(502, "The local model could not answer. Try again.");
+    const detail = await res.text().catch(() => "");
+    console.error(`Local model error ${res.status}: ${detail}`);
+    const reason = detail.match(/"(?:message|error)"\s*:\s*"([^"]{1,160})/)?.[1];
+    throw new LlmError(502, `The local model could not answer${reason ? `: ${reason}` : ""}.`);
   }
   const body = await res.json();
   const text = body.choices?.[0]?.message?.content ?? "";
-  try {
-    // Some local models wrap JSON in a code fence despite the schema.
-    return schema.parse(JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, "")));
-  } catch {
-    throw new LlmError(502, "The local model returned an unexpected answer. Try again.");
+  const result = parseLocalAnswer(text, schema);
+  if (!result) {
+    console.error(`Local model answer did not match the expected format:\n${text.slice(0, 1000)}`);
+    throw new LlmError(502, "The local model returned an answer in the wrong format. Try again, or try another model.");
   }
+  return result;
 }
 
 export function ask(task, request) {

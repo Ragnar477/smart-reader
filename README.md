@@ -66,6 +66,7 @@ Settings in `.env`:
 | `CLAUDE_PASSAGE_MODEL` | `claude-sonnet-5-5` | Model for passage explanations |
 | `LOCAL_LLM_URL` | `http://localhost:1234/v1` | Local server URL (LM Studio's default) |
 | `LOCAL_LLM_MODEL` | (server default) | Model name to request from the local server |
+| `LOCAL_LLM_TIMEOUT` | `120` | Seconds to wait for the local model before showing an error |
 | `PORT` | `5173` | Port for the app and API |
 
 ### Using a local model (LM Studio)

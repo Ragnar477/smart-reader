@@ -14,6 +14,8 @@ const CLAUDE_MODELS = {
 };
 const LOCAL_URL = (process.env.LOCAL_LLM_URL || "http://localhost:1234/v1").replace(/\/$/, "");
 const LOCAL_MODEL = process.env.LOCAL_LLM_MODEL || "";
+// Local models on a laptop can be slow, but a request that never returns should become an error.
+const LOCAL_TIMEOUT_MS = (Number(process.env.LOCAL_LLM_TIMEOUT) || 120) * 1000;
 
 export class LlmError extends Error {
   constructor(status, message) {
@@ -88,13 +90,19 @@ async function callLocal(body) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(LOCAL_TIMEOUT_MS),
     });
-  } catch {
+  } catch (error) {
+    if (error?.name === "TimeoutError") {
+      throw new LlmError(504, `The local model took longer than ${LOCAL_TIMEOUT_MS / 1000} seconds. Check that a model is loaded in LM Studio, or try a smaller one.`);
+    }
     throw new LlmError(502, `Could not reach the local model at ${LOCAL_URL}. Is LM Studio's server running?`);
   }
 }
 
 async function askLocal(task, { system, user, schema }) {
+  const started = Date.now();
+  console.log(`Asking the local model (${LOCAL_URL}) to explain a ${task}...`);
   const { $schema, ...jsonSchema } = z.toJSONSchema(schema);
   const base = { ...(LOCAL_MODEL && { model: LOCAL_MODEL }), temperature: 0.2 };
   let res = await callLocal({
@@ -122,13 +130,19 @@ async function askLocal(task, { system, user, schema }) {
     const reason = detail.match(/"(?:message|error)"\s*:\s*"([^"]{1,160})/)?.[1];
     throw new LlmError(502, `The local model could not answer${reason ? `: ${reason}` : ""}.`);
   }
-  const body = await res.json();
+  let body;
+  try {
+    body = await res.json();
+  } catch {
+    throw new LlmError(504, "The local model stopped before finishing its answer. Try again.");
+  }
   const text = body.choices?.[0]?.message?.content ?? "";
   const result = parseLocalAnswer(text, schema);
   if (!result) {
     console.error(`Local model answer did not match the expected format:\n${text.slice(0, 1000)}`);
     throw new LlmError(502, "The local model returned an answer in the wrong format. Try again, or try another model.");
   }
+  console.log(`Local model answered a ${task} lookup in ${((Date.now() - started) / 1000).toFixed(1)} s`);
   return result;
 }
 

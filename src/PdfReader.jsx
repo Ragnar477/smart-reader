@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-// The legacy build polyfills recent JavaScript features, so it works in browsers that are a few versions old.
-import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
-import workerUrl from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
+import pdfjs from "./pdf.js";
 import "pdfjs-dist/web/pdf_viewer.css";
 import { extractSelection } from "./context.js";
-
-pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+import { load, save } from "./storage.js";
+import { saveProgress } from "./library.js";
 
 const ZOOMS = [0.75, 1, 1.25, 1.5, 2];
 
-export default function PdfReader({ data, onSelect, onTitle, onNoText }) {
+export default function PdfReader({ data, bookKey, onSelect, onTitle, onNoText }) {
   const [doc, setDoc] = useState(null);
   const [pageSize, setPageSize] = useState(null);
   const [zoom, setZoom] = useState(1.25);
@@ -36,6 +34,31 @@ export default function PdfReader({ data, onSelect, onTitle, onNoText }) {
       task.destroy();
     };
   }, [data]);
+
+  // Remember how far down the book you scrolled, and come back there next time.
+  const positionKey = `smart-reader:pdf-pos:${bookKey}`;
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !bookKey) return;
+    const saved = load(positionKey, null);
+    if (saved > 0) el.scrollTop = saved * (el.scrollHeight - el.clientHeight);
+    let timer;
+    const onScroll = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const max = el.scrollHeight - el.clientHeight;
+        if (max <= 0) return;
+        const ratio = el.scrollTop / max;
+        save(positionKey, ratio);
+        saveProgress(bookKey, ratio * 100);
+      }, 300);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      clearTimeout(timer);
+      el.removeEventListener("scroll", onScroll);
+    };
+  }, [doc, pageSize, bookKey]);
 
   function handleSelection() {
     // Wait a tick so the browser has finished updating the selection.

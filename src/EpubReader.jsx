@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import ePub from "epubjs";
 import { extractSelection } from "./context.js";
 import { load, save } from "./storage.js";
+import { saveProgress } from "./library.js";
 
 export default function EpubReader({ data, bookKey, onSelect, onTitle }) {
   const viewerRef = useRef(null);
@@ -31,12 +32,24 @@ export default function EpubReader({ data, bookKey, onSelect, onTitle }) {
     const positionKey = `smart-reader:pos:${bookKey}`;
     rendition.display(load(positionKey, undefined)).catch((e) => setError(e.message));
     book.loaded.metadata.then((m) => m?.title && onTitle?.(m.title)).catch(() => {});
-    book.ready.then(() => book.locations.generate(1200)).catch(() => {});
+    book.ready
+      .then(() => book.locations.generate(1200))
+      .then(() => {
+        const cfi = rendition.currentLocation()?.start?.cfi;
+        if (!cfi) return;
+        const pct = book.locations.percentageFromCfi(cfi);
+        setProgress(Math.round(pct * 100));
+        saveProgress(bookKey, pct * 100);
+      })
+      .catch(() => {});
 
     rendition.on("relocated", (location) => {
       save(positionKey, location.start.cfi);
       const pct = location.start.percentage;
-      if (typeof pct === "number" && pct > 0) setProgress(Math.round(pct * 100));
+      if (typeof pct === "number" && pct > 0) {
+        setProgress(Math.round(pct * 100));
+        saveProgress(bookKey, pct * 100);
+      }
     });
 
     rendition.on("selected", (_cfiRange, contents) => {

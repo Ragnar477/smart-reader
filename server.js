@@ -6,10 +6,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { ask, describeModels, LlmError } from "./llm.js";
+import { registerShelfRoutes } from "./shelf.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const isDev = process.argv.includes("--dev");
 const PORT = Number(process.env.PORT) || 5173;
+// The app serves files from your computer, so by default only this computer can open it.
+const HOST = process.env.HOST || "127.0.0.1";
 
 const Explanation = z.object({
   lemma: z.string().describe("Dictionary form of the selected word or phrase"),
@@ -100,6 +103,7 @@ function sendError(res, error) {
 
 const app = express();
 app.use(express.json({ limit: "20kb" }));
+registerShelfRoutes(app);
 
 app.post("/api/explain", async (req, res) => {
   const parsed = WordRequest.safeParse(req.body);
@@ -152,6 +156,6 @@ if (isDev) {
   app.get("/{*any}", (_req, res) => res.sendFile(path.join(dist, "index.html")));
 }
 
-app.listen(PORT, () => {
+app.listen(PORT, HOST, () => {
   console.log(`Smart Reader running at http://localhost:${PORT} (model: ${describeModels()})`);
 });

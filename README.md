@@ -6,6 +6,13 @@ translation. Save words to a personal vocabulary list.
 
 ## What it does
 
+- **Your bookshelf**: the home screen shows every PDF and EPUB in your `shelf` folder
+  as 3D books standing on wooden shelves, with their real covers (the EPUB cover image,
+  or the first page of a PDF) and author. Each subfolder becomes its own shelf. Click a
+  book and it flies forward, opens, and you are reading. At the top, a 3D carousel
+  (WebGL) shows the books you are reading: drag or flick it, click a book to bring it
+  to the centre, click the centre book to open it. A progress bar under each book
+  shows where you are. Search by title, author or folder.
 - **Open PDF and EPUB** files from your computer (button or drag and drop). PDFs use
   PDF.js, EPUBs use epub.js. EPUBs remember where you stopped reading.
 - **Select a word or short phrase** (up to 6 words) to get, for that sentence:
@@ -67,7 +74,9 @@ Settings in `.env`:
 | `LOCAL_LLM_URL` | `http://localhost:1234/v1` | Local server URL (LM Studio's default) |
 | `LOCAL_LLM_MODEL` | (server default) | Model name to request from the local server |
 | `LOCAL_LLM_TIMEOUT` | `120` | Seconds to wait for the local model before showing an error |
+| `SHELF_DIR` | first of `~/shelf`, `~/Desktop/shelf`, `~/Documents/shelf` (also `Shelf`), `./shelf` | Folder the bookshelf shows. Subfolders become shelves (3 levels deep) |
 | `PORT` | `5173` | Port for the app and API |
+| `HOST` | `127.0.0.1` | Address the server listens on. It serves the books in your shelf folder, so it only answers this computer unless you set `0.0.0.0` |
 
 ### Using a local model (LM Studio)
 
@@ -79,11 +88,19 @@ explanations in other languages, which is where Claude is the better choice.
 ## How it's built
 
 ```
+shelf.js             GET /api/shelf lists the books in the shelf folder; GET
+                     /api/shelf/:id/file serves one (only files inside that folder)
 server.js            Express server: POST /api/explain (word) and /api/explain-passage,
                      in-memory answer cache, rate limit. In dev it also serves Vite.
 llm.js               Model providers: Claude (structured output) or a local
                      OpenAI-compatible server (JSON schema response format)
 src/App.jsx          Layout, file opening, lookups, vocabulary state
+src/Bookshelf.jsx    The 3D bookshelf (CSS 3D transforms, no 3D library), search,
+                     sort and the opening animation; styles in src/bookshelf.css
+src/carousel3d.js    The WebGL book carousel (Three.js, loaded only when shown)
+src/CoverCarousel.jsx React wrapper and caption for the carousel
+src/covers.js        Reads covers and metadata from the files, cached in IndexedDB
+src/library.js       Recently opened books and reading progress
 src/PdfReader.jsx    PDF.js pages with a selectable text layer, rendered lazily
 src/EpubReader.jsx   epub.js paginated reader, font size, saved position
 src/context.js       Turns a selection into { word, sentence, context }

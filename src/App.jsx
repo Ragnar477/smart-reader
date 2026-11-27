@@ -5,6 +5,8 @@ import ExplainPanel from "./ExplainPanel.jsx";
 import VocabList from "./VocabList.jsx";
 import PassagePanel from "./PassagePanel.jsx";
 import Review from "./Review.jsx";
+import Bookshelf from "./Bookshelf.jsx";
+import { bookKey, markOpened } from "./library.js";
 import { load, save } from "./storage.js";
 import { dueEntries, grade, newCard, withCard } from "./cards.js";
 
@@ -24,6 +26,7 @@ function detectFormat(file) {
 
 export default function App() {
   const [book, setBook] = useState(null); // { format, data, name, key, title }
+  const [view, setView] = useState("library"); // "library" | "reader"
   const [openError, setOpenError] = useState(null);
   const [noTextPages, setNoTextPages] = useState(0);
   const [lookup, setLookup] = useState(null); // { selection, status, result, error }
@@ -57,7 +60,23 @@ export default function App() {
     setNoTextPages(0);
     setLookup(null);
     const data = await file.arrayBuffer();
-    setBook({ format, data, name: file.name, key: `${file.name}:${file.size}`, title: file.name.replace(/\.(pdf|epub)$/i, "") });
+    setBook({ format, data, name: file.name, key: bookKey(file.name, file.size), title: file.name.replace(/\.(pdf|epub)$/i, "") });
+    setView("reader");
+  }
+
+  function openFromShelf(shelfBook, data, info) {
+    setOpenError(null);
+    setNoTextPages(0);
+    setLookup(null);
+    markOpened(shelfBook.id);
+    setBook({
+      format: shelfBook.format,
+      data,
+      name: shelfBook.file,
+      key: bookKey(shelfBook.file, shelfBook.size),
+      title: info?.title || shelfBook.title,
+    });
+    setView("reader");
   }
 
   const explain = useCallback(
@@ -138,9 +157,14 @@ export default function App() {
       <header className="topbar">
         <div className="brand">
           <span aria-hidden>📖</span> Smart Reader
-          {book && <span className="book-title" title={book.title}>· {book.title}</span>}
+          {book && view === "reader" && <span className="book-title" title={book.title}>· {book.title}</span>}
         </div>
         <div className="topbar-actions">
+          {view === "reader" ? (
+            <button onClick={() => setView("library")}>Library</button>
+          ) : (
+            book && <button onClick={() => setView("reader")}>Back to {book.title.length > 24 ? `${book.title.slice(0, 24)}…` : book.title}</button>
+          )}
           <label className="lang">
             I speak
             <select value={nativeLanguage} onChange={(e) => setNativeLanguage(e.target.value)}>
@@ -155,7 +179,13 @@ export default function App() {
         </div>
       </header>
 
-      <main className="layout">
+      {view === "library" && (
+        <main className={`library-main ${dragging ? "dragging" : ""}`}>
+          {openError && <div className="banner error">{openError}</div>}
+          <Bookshelf onOpen={openFromShelf} onChooseFile={() => fileInput.current.click()} />
+        </main>
+      )}
+      <main className="layout" hidden={view !== "reader"}>
         <section className={`reader ${dragging ? "dragging" : ""}`}>
           {!book && (
             <div className="welcome" onClick={() => fileInput.current.click()}>
@@ -171,7 +201,7 @@ export default function App() {
             <div className="banner">Some pages have no selectable text. This PDF may be scanned images, which this version can’t read yet.</div>
           )}
           {book?.format === "pdf" && (
-            <PdfReader key={book.key} data={book.data} onSelect={explain}
+            <PdfReader key={book.key} data={book.data} bookKey={book.key} onSelect={explain}
               onTitle={(t) => setBook((b) => ({ ...b, title: t }))} onNoText={() => setNoTextPages((n) => n + 1)} />
           )}
           {book?.format === "epub" && (

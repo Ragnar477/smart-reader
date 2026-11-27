@@ -46,7 +46,7 @@ select { font: inherit; color: inherit; background: var(--surface); border: 1px 
 .topbar-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .lang { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 0.9rem; }
 
-.layout { flex: 1; display: grid; grid-template-columns: 1fr 360px; min-height: 0; }
+.layout { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 360px; min-height: 0; }
 .reader { position: relative; display: flex; flex-direction: column; min-height: 0; background: var(--reader-bg); }
 .reader.dragging { outline: 3px dashed var(--accent); outline-offset: -10px; }
 .panel { border-left: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; min-height: 0; }
@@ -128,7 +128,11 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; padding: 0 1
 .grade-good span, .grade-easy span { color: var(--accent); }
 
 @media (max-width: 800px) {
-  .layout { grid-template-columns: 1fr; grid-template-rows: 1fr 40%; }
+  .layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 40%; }
   .panel { border-left: none; border-top: 1px solid var(--border); }
   .book-title { display: none; }
 }
+
+.layout[hidden] { display: none; }
+.library-main { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.library-main.dragging { outline: 3px dashed var(--accent); outline-offset: -6px; }

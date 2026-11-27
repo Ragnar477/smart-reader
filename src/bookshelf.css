@@ -1,0 +1,153 @@
+/* The library: one wooden shelf per folder, books standing face-out in CSS 3D. */
+:root {
+  --wood: #b07a4a;
+  --wood-dark: #7a4f2c;
+  --wall: #efe9de;
+  --book-w: 124px;
+  --book-h: 186px;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --wood: #6b4528; --wood-dark: #3d2615; --wall: #171513; }
+}
+
+.library { flex: 1; display: flex; flex-direction: column; min-height: 0; background: var(--wall); }
+.library-bar { display: flex; gap: 10px; align-items: center; padding: 12px 24px; flex-wrap: wrap; }
+.library-search { flex: 1; min-width: 180px; max-width: 420px; font: inherit; color: inherit; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); }
+.library-wall { flex: 1; overflow-y: auto; padding: 4px 0 40px; display: flex; flex-direction: column; }
+.library-note { text-align: center; }
+
+.shelf { padding: 0 0 8px; }
+.shelf-head { display: flex; align-items: baseline; gap: 8px; padding: 14px 24px 0; }
+.shelf-head h2 { font-size: 1.05rem; margin: 0; font-weight: 650; }
+.shelf-count { color: var(--muted); font-size: 0.85rem; }
+.shelf-nav { margin-left: auto; display: flex; gap: 6px; }
+.shelf-nav button { padding: 2px 10px; font-size: 1.1rem; line-height: 1.2; }
+
+/* The plank sits right under the books and scrolls with them. */
+.shelf-track {
+  --plank-top: calc(var(--book-h) + 34px);
+  display: flex;
+  gap: 34px;
+  overflow-x: auto;
+  padding: 20px 32px 6px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  background:
+    linear-gradient(to bottom, transparent var(--plank-top), var(--wood) var(--plank-top), var(--wood) calc(var(--plank-top) + 10px),
+      var(--wood-dark) calc(var(--plank-top) + 10px), var(--wood-dark) calc(var(--plank-top) + 16px), transparent calc(var(--plank-top) + 16px));
+  background-attachment: local;
+}
+.book-slot { flex: 0 0 var(--book-w); width: var(--book-w); scroll-snap-align: start; }
+
+.book {
+  display: block; position: relative; padding: 0; margin: 0 0 22px; border: none; background: none; border-radius: 0;
+  width: var(--book-w); height: calc(var(--book-h) + 14px);
+  perspective: 900px; perspective-origin: 50% 30%;
+}
+.book:hover:not(:disabled) { border: none; }
+.book:focus-visible { outline: 3px solid var(--accent); outline-offset: 6px; border-radius: 4px; }
+
+.book-3d {
+  position: absolute; left: 0; bottom: 0; width: var(--book-w); height: var(--book-h);
+  transform-style: preserve-3d;
+  transform: rotateY(28deg);
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.3, 1.2);
+}
+.book:hover .book-3d, .book:focus-visible .book-3d { transform: translateY(-12px) translateZ(24px) rotateY(4deg); }
+.book:active .book-3d { transform: translateY(-6px) translateZ(12px) rotateY(0deg); }
+.book.is-opening .book-3d { visibility: hidden; }
+
+.book-face { position: absolute; backface-visibility: hidden; }
+.book-front, .book-back { inset: 0; }
+.book-front {
+  transform: translateZ(calc(var(--d) / 2));
+  border-radius: 2px 4px 4px 2px; overflow: hidden; background: var(--cover) center / cover;
+  box-shadow: inset 4px 0 6px -3px rgba(0, 0, 0, 0.45), inset -1px 0 0 rgba(255, 255, 255, 0.15);
+}
+.book-front img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.book-front::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, rgba(255,255,255,0.18), transparent 35%, transparent 70%, rgba(0,0,0,0.12)); }
+.book-back { transform: rotateY(180deg) translateZ(calc(var(--d) / 2)); background: #3a332b; }
+.book-spine, .book-pages { top: 0; height: 100%; width: var(--d); left: calc(50% - var(--d) / 2); }
+.book-spine { transform: rotateY(-90deg) translateZ(calc(var(--book-w) / 2)); background: var(--cover) left center / cover; filter: brightness(0.6); }
+.book-pages {
+  transform: rotateY(90deg) translateZ(calc(var(--book-w) / 2 - 3px));
+  background: repeating-linear-gradient(to right, #f3ecdc 0 1px, #ddd3bf 1px 2px);
+  height: calc(100% - 6px); top: 3px;
+}
+.book-top {
+  width: calc(100% - 3px); height: var(--d); left: 0; top: calc(50% - var(--d) / 2);
+  transform: rotateX(90deg) translateZ(calc(var(--book-h) / 2 - 3px));
+  background: repeating-linear-gradient(to bottom, #f3ecdc 0 1px, #ddd3bf 1px 2px);
+}
+/* Shadow cast on the plank. */
+.book::after {
+  content: ""; position: absolute; left: 6%; right: -4%; bottom: -6px; height: 10px; border-radius: 50%;
+  background: radial-gradient(rgba(0, 0, 0, 0.35), transparent 70%); transition: transform 0.35s, opacity 0.35s;
+}
+.book:hover::after { transform: scale(0.85); opacity: 0.6; }
+
+.book-loading { position: absolute; inset: auto 0 0 0; height: var(--book-h); background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.25) 50%, transparent 70%); background-size: 200% 100%; animation: shimmer 1.4s infinite; pointer-events: none; }
+@keyframes shimmer { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+
+.drawn-cover {
+  height: 100%; display: flex; flex-direction: column; padding: 16px 12px 12px; gap: 8px; color: #fdf8ee;
+  background:
+    linear-gradient(to bottom, transparent 70%, rgba(0,0,0,0.25)),
+    linear-gradient(hsl(var(--hue) 45% 34%), hsl(calc(var(--hue) + 25) 50% 24%));
+  text-align: left;
+}
+.drawn-cover::before { content: ""; display: block; height: 2px; background: rgba(255, 240, 200, 0.6); margin-bottom: 4px; }
+.drawn-title { font-family: Georgia, "Times New Roman", serif; font-size: 0.98rem; line-height: 1.2; font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.drawn-author { font-size: 0.75rem; opacity: 0.85; }
+.drawn-format { margin-top: auto; font-size: 0.65rem; letter-spacing: 0.12em; opacity: 0.7; }
+
+.book-caption { display: flex; flex-direction: column; gap: 2px; font-size: 0.82rem; }
+.caption-title { font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; }
+.caption-meta { color: var(--muted); font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.caption-progress { height: 3px; border-radius: 2px; background: var(--border); overflow: hidden; margin-top: 3px; }
+.caption-progress span { display: block; height: 100%; background: var(--accent); }
+
+/* Opening: the book flies to the centre and the cover swings open. */
+.opening-layer { position: fixed; inset: 0; z-index: 50; background: rgba(20, 16, 12, 0); transition: background 0.5s; pointer-events: all; perspective: 1600px; }
+.opening-layer.flying { background: rgba(20, 16, 12, 0.55); }
+.opening-book { position: fixed; transform-origin: center; transform-style: preserve-3d; transition: transform 0.55s cubic-bezier(0.3, 0.7, 0.2, 1); }
+.opening-page {
+  position: absolute; inset: 0; background: #fbf7ee; color: #3a342b; border-radius: 2px 4px 4px 2px;
+  display: flex; align-items: center; justify-content: center; padding: 10px; text-align: center;
+  font-family: Georgia, serif; font-size: 0.7rem; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+}
+.opening-cover {
+  position: absolute; inset: 0; transform-origin: left center; transition: transform 0.6s 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 2px 4px 4px 2px; overflow: hidden; backface-visibility: hidden; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+}
+.opening-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.flying .opening-cover { transform: rotateY(-165deg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .book-3d, .book::after { transition: none; }
+  .book-loading { animation: none; }
+}
+@media (max-width: 800px) {
+  :root { --book-w: 98px; --book-h: 147px; }
+  .library-bar, .shelf-head { padding-left: 16px; padding-right: 16px; }
+  .shelf-track { padding-left: 16px; padding-right: 16px; gap: 22px; }
+  .shelf-nav { display: none; }
+  .drawn-title { font-size: 0.82rem; }
+}
+
+/* 3D cover carousel (WebGL) above the shelves. */
+.carousel { padding-bottom: 8px; outline: none; }
+.carousel:focus-visible .carousel-stage { box-shadow: inset 0 0 0 2px var(--accent); }
+.carousel-stage { position: relative; height: clamp(260px, 38vh, 380px); margin: 0 12px; border-radius: 16px; overflow: hidden;
+  background: radial-gradient(70% 90% at 50% 0%, color-mix(in srgb, var(--surface) 90%, transparent), transparent 75%); }
+.carousel-loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 0.9rem; }
+.carousel-meta { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 6px 16px 0; }
+.carousel-caption { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; width: min(320px, 60vw); text-align: center; }
+.carousel-caption strong { font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.carousel-caption > span:not(.caption-progress) { color: var(--muted); font-size: 0.82rem; }
+.carousel-caption .caption-progress { width: 160px; }
+.carousel-arrow { padding: 2px 12px; font-size: 1.2rem; line-height: 1.2; }
+@media (max-width: 800px) {
+  .carousel-stage { margin: 0; border-radius: 0; height: 260px; }
+  .carousel-meta { flex-wrap: wrap; gap: 8px; }
+}

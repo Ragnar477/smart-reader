@@ -3,6 +3,7 @@ import { bookInfo } from "./covers.js";
 import { bookKey, loadProgress, recentBooks } from "./library.js";
 import { load, save } from "./storage.js";
 import "./bookshelf.css";
+import CoverCarousel from "./CoverCarousel.jsx";
 
 const SORTS = {
   title: { label: "Title", compare: (a, b) => a.displayTitle.localeCompare(b.displayTitle) },
@@ -151,6 +152,7 @@ export default function Bookshelf({ onOpen, onChooseFile }) {
   const [sort, setSort] = useState(() => load("smart-reader:shelf-sort", "title"));
   const [opening, setOpening] = useState(null);
   const [openError, setOpenError] = useState(null);
+  const [carouselFailed, setCarouselFailed] = useState(false);
 
   async function refresh() {
     setState((s) => ({ ...s, status: s.books ? "refreshing" : "loading" }));
@@ -196,9 +198,20 @@ export default function Bookshelf({ onOpen, onChooseFile }) {
       .sort(SORTS[sort].compare);
   }, [state.books, infos, query, sort]);
 
+  // The 3D carousel shows the books you are reading, or a first pick from the shelf.
+  // Built from the server's list, not the sorted one, so it doesn't rebuild as covers load.
+  const featured = useMemo(() => {
+    const all = state.books || [];
+    const byId = new Map(all.map((b) => [b.id, b]));
+    const recent = recentBooks().map((r) => byId.get(r.id)).filter(Boolean);
+    if (recent.length) return { title: "Continue reading", books: recent.slice(0, 12) };
+    return { title: "From your shelf", books: all.slice(0, 12) };
+  }, [state.books]);
+  const showCarousel = !query && !carouselFailed && featured.books.length > 0;
+
   const shelves = useMemo(() => {
     const groups = new Map();
-    if (!query) {
+    if (!query && carouselFailed) {
       const byId = new Map(books.map((b) => [b.id, b]));
       const recent = recentBooks().map((r) => byId.get(r.id)).filter(Boolean);
       if (recent.length) groups.set("Continue reading", recent);
@@ -207,7 +220,7 @@ export default function Bookshelf({ onOpen, onChooseFile }) {
     const folders = [...new Set(books.map((b) => b.shelf))].sort((a, b) => (a === "" ? -1 : b === "" ? 1 : a.localeCompare(b)));
     for (const folder of folders) groups.set(folder || "My shelf", books.filter((b) => b.shelf === folder));
     return [...groups];
-  }, [books, query]);
+  }, [books, query, carouselFailed]);
 
   return (
     <div className="library">
@@ -254,6 +267,9 @@ export default function Bookshelf({ onOpen, onChooseFile }) {
           </div>
         )}
         {state.dir && state.books?.length > 0 && books.length === 0 && <p className="reader-message">No book matches “{query}”.</p>}
+        {showCarousel && (
+          <CoverCarousel title={featured.title} books={featured.books} infos={infos} onOpen={open} onFail={() => setCarouselFailed(true)} />
+        )}
         {shelves.map(([name, list]) => (
           <Shelf key={name} name={name} books={list} infos={infos} onInfo={onInfo} onOpen={open} openingId={opening?.book.id} />
         ))}

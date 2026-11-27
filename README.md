@@ -9,8 +9,10 @@ translation. Save words to a personal vocabulary list.
 - **Your bookshelf**: the home screen shows every PDF and EPUB in your `shelf` folder
   as 3D books standing on wooden shelves, with their real covers (the EPUB cover image,
   or the first page of a PDF) and author. Each subfolder becomes its own shelf. Click a
-  book and it flies forward, opens, and you are reading. A "Continue reading" shelf and
-  a progress bar under each book show where you are. Search by title, author or folder.
+  book and it flies forward, opens, and you are reading. At the top, a 3D carousel
+  (WebGL) shows the books you are reading: drag or flick it, click a book to bring it
+  to the centre, click the centre book to open it. A progress bar under each book
+  shows where you are. Search by title, author or folder.
 - **Open PDF and EPUB** files from your computer (button or drag and drop). PDFs use
   PDF.js, EPUBs use epub.js. EPUBs remember where you stopped reading.
 - **Select a word or short phrase** (up to 6 words) to get, for that sentence:
@@ -95,6 +97,8 @@ llm.js               Model providers: Claude (structured output) or a local
 src/App.jsx          Layout, file opening, lookups, vocabulary state
 src/Bookshelf.jsx    The 3D bookshelf (CSS 3D transforms, no 3D library), search,
                      sort and the opening animation; styles in src/bookshelf.css
+src/carousel3d.js    The WebGL book carousel (Three.js, loaded only when shown)
+src/CoverCarousel.jsx React wrapper and caption for the carousel
 src/covers.js        Reads covers and metadata from the files, cached in IndexedDB
 src/library.js       Recently opened books and reading progress
 src/PdfReader.jsx    PDF.js pages with a selectable text layer, rendered lazily
